@@ -1,0 +1,21 @@
+appId: com.gittasks.app
+productName: GitTasks
+copyright: MIT licensed
+
+directories:
+  output: dist
+
+# Nothing needs to ship in node_modules: main, preload and renderer are all
+# bundled into out/ by electron-vite, and git is spawned from the system.
+files:
+  - out/**
+  - package.json
+
+win:
+  target: nsis
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  # The installer is unsigned, so Windows SmartScreen will warn on first run.
+  # That is expected rather than a packaging failure.

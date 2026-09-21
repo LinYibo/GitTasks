@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "emitDeclarationOnly": true,
+    "outDir": "node_modules/.tmp/tsc-node",
+    "tsBuildInfoFile": "node_modules/.tmp/tsc-node.tsbuildinfo",
+
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    // The sources are ESM and are bundled by electron-vite into CJS. `preserve`
+    // describes that accurately; `NodeNext` would read the root package.json's
+    // missing "type" field and misjudge these files as CommonJS.
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/main/**/*.ts",
+    "src/preload/**/*.ts",
+    "src/shared/**/*.ts",
+    "electron.vite.config.ts"
+  ]
+}
