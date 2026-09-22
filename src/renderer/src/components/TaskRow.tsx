@@ -1,4 +1,4 @@
-import { Check, Pencil, Trash } from 'lucide-react'
+import { ArrowRight, Check, Pencil, Trash } from 'lucide-react'
 
 import type { Priority, Task } from '../../../shared/types.ts'
 import { useStore } from '../store.ts'
@@ -44,6 +44,7 @@ function Summary({ task }: { task: Task }) {
 
       {/* Hidden until hover or focus, so the list stays quiet at rest. */}
       <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100">
+        <ProjectPicker task={task} />
         <IconButton label={`Edit ${task.title}`} onClick={() => beginEdit(task.line)}>
           <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
         </IconButton>
@@ -56,8 +57,50 @@ function Summary({ task }: { task: Task }) {
 }
 
 /**
+ * A project is a section of the file rather than a token on the task, so moving
+ * between them is a separate act from editing the text — it keeps the raw line
+ * verbatim, whatever other metadata it carries.
+ */
+function ProjectPicker({ task }: { task: Task }) {
+  const projects = useStore((state) => state.doc.projects)
+  const moveTask = useStore((state) => state.moveTask)
+
+  const here = projects.find((project) => project.line === task.projectLine)?.title
+  const options = projects.filter((project) => project.title !== here)
+
+  // With one project there is nowhere to move to.
+  if (options.length === 0) return null
+
+  // Choosing is the whole interaction, so this is a select and not a menu.
+  // The empty option is where it rests, and cannot be chosen again.
+  return (
+    <label className="relative inline-flex">
+      <span className="sr-only">Move {task.title} to another project</span>
+      <select
+        aria-label={`Move ${task.title} to another project`}
+        value=""
+        onChange={(event) => {
+          if (event.target.value) void moveTask(task.line, event.target.value)
+        }}
+        className="absolute inset-0 cursor-pointer appearance-none opacity-0"
+      >
+        <option value="" />
+        {options.map((project) => (
+          <option key={project.title} value={project.title}>
+            Move to {project.title}
+          </option>
+        ))}
+      </select>
+      <span className="pointer-events-none inline-flex h-7 w-7 items-center justify-center rounded-md text-subtle transition-colors duration-150 hover:bg-surface-elevated hover:text-fg">
+        <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+      </span>
+    </label>
+  )
+}
+
+/**
  * The task is edited with the same inline syntax the file uses, so there are no
- * separate controls for tags, projects, priorities or dates.
+ * separate controls for tags, priorities or dates.
  */
 function Editor({ task }: { task: Task }) {
   const draft = useStore((state) => state.editDraft)
@@ -95,8 +138,8 @@ const PRIORITY_CLASS: Record<Priority, string> = {
 }
 
 function Metadata({ task }: { task: Task }) {
-  const { tags, project, priority, due } = task
-  if (!tags.length && !project && !priority && !due) return null
+  const { tags, priority, due } = task
+  if (!tags.length && !priority && !due) return null
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
@@ -111,8 +154,6 @@ function Metadata({ task }: { task: Task }) {
           {due}
         </span>
       )}
-
-      {project && <span className="text-[11px] text-muted">+{project}</span>}
 
       {tags.map((tag) => (
         <span key={tag} className="text-[11px] text-subtle">

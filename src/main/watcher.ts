@@ -8,7 +8,7 @@ import { TASKS_FILE } from './store.ts'
 const SETTLE_MS = 120
 
 /**
- * Watch the repo *directory* and filter by name, rather than watching
+ * Watch the tasks *directory* and filter by name, rather than watching
  * tasks.md directly.
  *
  * Saving is temp-file-plus-rename, which replaces the directory entry. A watch

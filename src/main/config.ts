@@ -1,4 +1,4 @@
-/** Remembers which repo the user last had open, in Electron's userData dir. */
+/** Remembers which folder the user last had open, in Electron's userData dir. */
 
 import { existsSync } from 'node:fs'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
@@ -7,8 +7,7 @@ import { dirname, join } from 'node:path'
 import { app } from 'electron'
 
 type Config = {
-  repoPath?: string
-  gitPath?: string
+  folderPath?: string
 }
 
 function configPath(): string {

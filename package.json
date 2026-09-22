@@ -1,7 +1,7 @@
 {
   "name": "gittasks",
   "version": "0.1.0",
-  "description": "A local-first, git-backed, no-server, markdown-based todo app.",
+  "description": "A local-first, no-server, markdown-based todo app.",
   "author": "GitTasks",
   "license": "MIT",
   "private": true,

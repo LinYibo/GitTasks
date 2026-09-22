@@ -5,69 +5,88 @@ import { Backdrop } from './components/Backdrop.tsx'
 import { Composer } from './components/Composer.tsx'
 import { CountLine } from './components/CountLine.tsx'
 import { ErrorBanner } from './components/ErrorBanner.tsx'
+import { EmptyState } from './components/EmptyState.tsx'
 import { FilterTabs } from './components/FilterTabs.tsx'
-import { GitMissing } from './components/GitMissing.tsx'
-import { Header } from './components/Header.tsx'
-import { NoRepo } from './components/NoRepo.tsx'
-import { SyncStatus } from './components/SyncStatus.tsx'
+import { NoFolder } from './components/NoFolder.tsx'
+import { RepoBar } from './components/RepoBar.tsx'
+import { Sidebar } from './components/Sidebar.tsx'
 import { TaskList } from './components/TaskList.tsx'
 import { useStore } from './store.ts'
 
 export function App() {
   const ready = useStore((state) => state.ready)
-  const gitAvailable = useStore((state) => state.gitAvailable)
-  const repoPath = useStore((state) => state.repoPath)
+  const folderPath = useStore((state) => state.folderPath)
 
   const init = useStore((state) => state.init)
   const receiveDoc = useStore((state) => state.receiveDoc)
-  const receiveStatus = useStore((state) => state.receiveStatus)
 
   useEffect(() => {
     void init()
   }, [init])
 
-  // Main pushes a document whenever the file changes underneath us — an edit in
-  // another editor, or a pull.
-  useEffect(() => {
-    const offDoc = api.onDocChanged(receiveDoc)
-    const offStatus = api.onStatusChanged(receiveStatus)
-
-    return () => {
-      offDoc()
-      offStatus()
-    }
-  }, [receiveDoc, receiveStatus])
+  // Main pushes a document whenever the file changes underneath us, for
+  // instance from an edit in another editor.
+  useEffect(() => api.onDocChanged(receiveDoc), [receiveDoc])
 
   return (
-    <main className="min-h-dvh bg-bg">
+    <div className="flex h-dvh">
       <Backdrop />
 
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 py-10 sm:py-14">
-        <Header />
+      {ready && (
+        <>
+          {folderPath && <Sidebar />}
 
-        {ready && <ErrorBanner />}
-
-        {ready && (gitAvailable ? (repoPath ? <Tasks /> : <NoRepo />) : <GitMissing />)}
-      </div>
-    </main>
+          <main className="flex min-w-0 flex-1 flex-col">
+            {folderPath ? <Tasks /> : <NoFolder />}
+          </main>
+        </>
+      )}
+    </div>
   )
 }
 
+/** The main pane: always exactly one project, never a merged view of them. */
 function Tasks() {
+  const project = useStore((state) => state.selectedProject)
+
   return (
     <>
-      <Composer />
+      <div className="flex flex-col gap-4 px-6 pb-5 pt-6">
+        {project && <ProjectHeading project={project} />}
+        {project && <Composer project={project} />}
 
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <FilterTabs />
-          <CountLine />
-        </div>
-
-        <TaskList />
+        {/* Outside the branch above: a rejected project name is an error the
+            user can only hit while there is nothing selected. */}
+        <ErrorBanner />
       </div>
 
-      <SyncStatus />
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-6 pb-6">
+        {project ? (
+          <TaskList />
+        ) : (
+          <EmptyState
+            title="No projects yet"
+            description="A project is one ## heading in tasks.md. Create one in the sidebar to start adding tasks."
+          />
+        )}
+      </div>
+
+      <div className="px-6 pb-5">
+        <RepoBar />
+      </div>
     </>
+  )
+}
+
+function ProjectHeading({ project }: { project: string }) {
+  return (
+    <header className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex min-w-0 flex-col gap-1">
+        <h1 className="truncate text-xl font-semibold tracking-tight text-fg">{project}</h1>
+        <CountLine />
+      </div>
+
+      <FilterTabs />
+    </header>
   )
 }

@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { normalizeEol, parseDoc, parseTaskFields, parseTaskLine } from './parse.ts'
+import { normalizeEol, parseDoc, parseProjectHeading, parseTaskFields, parseTaskLine } from './parse.ts'
 
-const parse = (line: string) => parseTaskLine(line, 0)
+const parse = (line: string) => parseTaskLine(line, 0, null)
 
 test('parses a plain incomplete task', () => {
   assert.deepStrictEqual(parse('- [ ] Buy milk'), {
@@ -12,7 +12,7 @@ test('parses a plain incomplete task', () => {
     title: 'Buy milk',
     completed: false,
     tags: [],
-    project: undefined,
+    projectLine: null,
     priority: undefined,
     due: undefined,
   })
@@ -44,10 +44,10 @@ test('ignores lines that are not checkboxes', () => {
 })
 
 test('extracts inline metadata', () => {
-  const task = parse('- [ ] Ship the release #work #urgent +GitTasks p1 due:2026-09-20')
+  const task = parse('- [ ] Ship the release #work #urgent p1 due:2026-09-20')
   assert.deepStrictEqual(
-    { title: task?.title, tags: task?.tags, project: task?.project, priority: task?.priority, due: task?.due },
-    { title: 'Ship the release', tags: ['work', 'urgent'], project: 'GitTasks', priority: 1, due: '2026-09-20' },
+    { title: task?.title, tags: task?.tags, priority: task?.priority, due: task?.due },
+    { title: 'Ship the release', tags: ['work', 'urgent'], priority: 1, due: '2026-09-20' },
   )
 })
 
@@ -62,7 +62,6 @@ test('leaves `Fix issue #42` alone', () => {
     title: 'Fix issue #42',
     completed: false,
     tags: [],
-    project: undefined,
     priority: undefined,
     due: undefined,
   })
@@ -76,8 +75,13 @@ test('leaves `owner/repo#42` alone', () => {
 })
 
 test('leaves `C++` alone', () => {
-  assert.equal(parse('- [ ] Learn C++')?.project, undefined)
   assert.equal(parse('- [ ] Learn C++')?.title, 'Learn C++')
+})
+
+test('leaves an old `+project` token in the title', () => {
+  // Projects became `## headings`, so a token the app used to claim is now
+  // just words the author typed.
+  assert.equal(parse('- [ ] Ship it +GitTasks')?.title, 'Ship it +GitTasks')
 })
 
 test('leaves `#2 pencils` alone', () => {
@@ -139,7 +143,39 @@ test('parseDoc keeps every line and derives tasks in order', () => {
 })
 
 test('parseDoc tolerates CRLF input', () => {
-  const doc = parseDoc('# Tasks\r\n\r\n- [ ] one\r\n')
-  assert.deepStrictEqual(doc.lines, ['# Tasks', '', '- [ ] one', ''])
+  const doc = parseDoc('# Tasks\r\n\r\n## Release\r\n\r\n- [ ] one\r\n')
+  assert.deepStrictEqual(doc.lines, ['# Tasks', '', '## Release', '', '- [ ] one', ''])
+  assert.deepStrictEqual(doc.projects, [{ line: 2, title: 'Release' }])
   assert.equal(doc.tasks.length, 1)
+})
+
+test('a project is a heading of exactly two hashes', () => {
+  assert.equal(parseProjectHeading('## Release'), 'Release')
+  assert.equal(parseProjectHeading('##\tRelease'), 'Release')
+  assert.equal(parseProjectHeading('##   Release   '), 'Release')
+})
+
+test('document titles and subsections are not projects', () => {
+  // Claiming only `##` leaves the rest of the author's headings alone.
+  assert.equal(parseProjectHeading('# Tasks'), null)
+  assert.equal(parseProjectHeading('### Roadmap'), null)
+  assert.equal(parseProjectHeading('##Release'), null)
+  assert.equal(parseProjectHeading('## '), null)
+})
+
+test('parseDoc files tasks under the nearest heading above them', () => {
+  const doc = parseDoc('- [ ] loose\n## A\n- [ ] first\n## B\n- [ ] second\n- [x] third')
+  assert.deepStrictEqual(doc.projects, [
+    { line: 1, title: 'A' },
+    { line: 3, title: 'B' },
+  ])
+  assert.deepStrictEqual(
+    doc.tasks.map((task) => [task.line, task.title, task.projectLine]),
+    [
+      [0, 'loose', null],
+      [2, 'first', 1],
+      [4, 'second', 3],
+      [5, 'third', 3],
+    ],
+  )
 })

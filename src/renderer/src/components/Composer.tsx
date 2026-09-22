@@ -2,7 +2,7 @@ import { Plus } from 'lucide-react'
 
 import { useStore } from '../store.ts'
 
-export function Composer() {
+export function Composer({ project }: { project: string }) {
   const text = useStore((state) => state.composerText)
   const setComposerText = useStore((state) => state.setComposerText)
   const addTask = useStore((state) => state.addTask)
@@ -18,7 +18,7 @@ export function Composer() {
       >
         <input
           className="h-11 w-full min-w-0 border-0 bg-transparent px-3 text-sm text-fg outline-none placeholder:text-subtle"
-          placeholder="Add a new task…"
+          placeholder={`Add a task to ${project}…`}
           aria-label="New task"
           autoComplete="off"
           maxLength={200}
@@ -41,8 +41,8 @@ export function Composer() {
       {/* The composer and the inline editor take the same syntax as the file,
           so this hint is the only thing teaching it. */}
       <p className="px-1 text-xs text-subtle">
-        Inline: <span className="text-muted">#tag</span> <span className="text-muted">+project</span>{' '}
-        <span className="text-muted">p1</span> <span className="text-muted">due:2026-09-20</span>
+        Inline: <span className="text-muted">#tag</span> <span className="text-muted">p1</span>{' '}
+        <span className="text-muted">due:2026-09-20</span>
       </p>
     </div>
   )

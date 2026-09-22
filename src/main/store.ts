@@ -24,7 +24,7 @@ export function toDoc(text: string): Doc {
   return { hash: hashText(text), ...parseDoc(text) }
 }
 
-/** A missing file is the ordinary state of a freshly bound repo, not an error. */
+/** A missing file just means the folder has not been written to yet. */
 export async function readTasksFile(dir: string): Promise<string> {
   const path = join(dir, TASKS_FILE)
   return existsSync(path) ? normalizeEol(await readFile(path, 'utf8')) : ''

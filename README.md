@@ -1,6 +1,6 @@
 # GitTasks
 
-A local-first, git-backed, no-server, markdown-based todo app.
+A local-first, no-server, markdown-based todo app.
 
 Built with [Electron](https://www.electronjs.org/) + [electron-vite](https://electron-vite.org/).
 

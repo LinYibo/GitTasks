@@ -3,19 +3,16 @@ import { join } from 'node:path'
 import { app, BrowserWindow, Menu } from 'electron'
 
 import { registerIpc } from './ipc.ts'
-import { detectGit, flushPending, restore } from './session.ts'
-
-/**
- * Guards the async flush in `before-quit`: preventing the quit to commit first
- * means a second quit attempt arrives while the first is still pending.
- */
-let quitting = false
+import { restore } from './session.ts'
 
 function createWindow(): BrowserWindow {
   const window = new BrowserWindow({
-    width: 720,
-    height: 820,
-    minWidth: 420,
+    width: 1040,
+    height: 860,
+    // Wide enough for the project sidebar and the task pane together. The
+    // sidebar does not collapse, so there is no point going narrower.
+    minWidth: 760,
+    minHeight: 520,
     // Matches the app background, so there is no white flash on open.
     backgroundColor: '#0a0a0b',
     // The packaged exe carries its own icon (build/icon.ico), but under
@@ -32,10 +29,6 @@ function createWindow(): BrowserWindow {
       nodeIntegration: false,
     },
   })
-
-  // Commit pending edits when the user looks away, so history stays tidy
-  // without needing a commit per keystroke.
-  window.on('blur', () => void flushPending())
 
   window.once('ready-to-show', () => window.show())
 
@@ -54,7 +47,6 @@ void app.whenReady().then(async () => {
 
   // Restore before the window exists, so the renderer's first `repo:state` call
   // always sees a settled session rather than racing this.
-  await detectGit()
   await restore()
 
   createWindow()
@@ -66,15 +58,4 @@ void app.whenReady().then(async () => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
-})
-
-app.on('before-quit', (event) => {
-  if (quitting) return
-
-  event.preventDefault()
-  quitting = true
-
-  // `flushPending` reports its own failures rather than rejecting, so this
-  // always reaches `quit`.
-  void flushPending().finally(() => app.quit())
 })

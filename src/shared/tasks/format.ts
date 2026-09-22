@@ -11,11 +11,10 @@ import type { TaskFields } from '../types.ts'
 /**
  * The editable text of a task: title followed by metadata, no checkbox. This is
  * what the composer and the inline editor round-trip, so the app never needs a
- * separate set of widgets for tags, projects, priorities or dates.
+ * separate set of widgets for tags, priorities or dates.
  */
 export function taskToText(fields: TaskFields): string {
   const meta: string[] = fields.tags.map((tag) => `#${tag}`)
-  if (fields.project) meta.push(`+${fields.project}`)
   if (fields.priority) meta.push(`p${fields.priority}`)
   if (fields.due) meta.push(`due:${fields.due}`)
 
@@ -24,6 +23,11 @@ export function taskToText(fields: TaskFields): string {
 
 export function formatTaskLine(fields: TaskFields): string {
   return `- [${fields.completed ? 'x' : ' '}] ${taskToText(fields)}`
+}
+
+/** A project title as the `## heading` line that owns its tasks. */
+export function formatProjectHeading(title: string): string {
+  return `## ${title}`
 }
 
 /**

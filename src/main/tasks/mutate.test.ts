@@ -4,34 +4,49 @@ import { test } from 'node:test'
 import { applyMutation } from './mutate.ts'
 import { parseDoc } from '../../shared/tasks/parse.ts'
 
-test('adds a task to an empty document', () => {
-  // `''` parses to a single empty line, which is the trailing newline. The task
-  // goes in front of it, so the file keeps ending with one.
-  assert.deepStrictEqual(applyMutation(parseDoc(''), { kind: 'add', text: 'Buy milk' }), [
-    '- [ ] Buy milk',
+test('a task is written under the heading of the project it was asked for', () => {
+  assert.deepStrictEqual(
+    applyMutation(parseDoc('## A\n'), { kind: 'add', text: 'Buy milk', projectLine: 0 }),
+    ['## A', '', '- [ ] Buy milk'],
+  )
+})
+
+test('a task is added after the last task of its project', () => {
+  const source = '## A\n\n- [ ] one\n- [ ] two\n'
+  const lines = applyMutation(parseDoc(source), { kind: 'add', text: 'third', projectLine: 0 })
+  assert.deepStrictEqual(lines, ['## A', '', '- [ ] one', '- [ ] two', '- [ ] third', ''])
+})
+
+test('a task is never written into the project below', () => {
+  // The heading at line 3 is the boundary, and the new line stays above it with
+  // a blank between them.
+  const source = '## A\n\n- [ ] one\n## B\n\n- [ ] two\n'
+  const lines = applyMutation(parseDoc(source), { kind: 'add', text: 'more', projectLine: 0 })
+  assert.deepStrictEqual(lines, [
+    '## A',
+    '',
+    '- [ ] one',
+    '- [ ] more',
+    '',
+    '## B',
+    '',
+    '- [ ] two',
     '',
   ])
 })
 
-test('adds a task after the last existing task', () => {
-  const lines = applyMutation(parseDoc('- [ ] first\n- [ ] second'), { kind: 'add', text: 'third' })
-  assert.deepStrictEqual(lines, ['- [ ] first', '- [ ] second', '- [ ] third'])
-})
-
-test('adds a task below a heading without disturbing it', () => {
-  const source = '# Tasks\n\nSome notes.\n'
-  const lines = applyMutation(parseDoc(source), { kind: 'add', text: 'Buy milk' })
-  assert.deepStrictEqual(lines, ['# Tasks', '', 'Some notes.', '- [ ] Buy milk', ''])
-})
-
 test('adds a task with metadata already parsed', () => {
-  const lines = applyMutation(parseDoc(''), { kind: 'add', text: 'Ship it #work +GitTasks p1 due:2026-09-20' })
-  assert.deepStrictEqual(lines, ['- [ ] Ship it #work +GitTasks p1 due:2026-09-20', ''])
+  const lines = applyMutation(parseDoc('## A\n'), {
+    kind: 'add',
+    text: 'Ship it #work p1 due:2026-09-20',
+    projectLine: 0,
+  })
+  assert.deepStrictEqual(lines, ['## A', '', '- [ ] Ship it #work p1 due:2026-09-20'])
 })
 
 test('rejects a task with no title', () => {
   assert.throws(
-    () => applyMutation(parseDoc(''), { kind: 'add', text: '  #urgent  ' }),
+    () => applyMutation(parseDoc('## A\n'), { kind: 'add', text: '  #urgent  ', projectLine: 0 }),
     (error: Error & { code?: string }) => error.code === 'EMPTY_TASK',
   )
 })
@@ -82,11 +97,135 @@ test('refuses to touch a line that is not a task', () => {
 })
 
 test('mutations are pure', () => {
-  const doc = parseDoc('- [ ] one')
-  applyMutation(doc, { kind: 'toggle', line: 0 })
-  applyMutation(doc, { kind: 'delete', line: 0 })
-  applyMutation(doc, { kind: 'add', text: 'two' })
+  const doc = parseDoc('## A\n\n- [ ] one')
+  applyMutation(doc, { kind: 'toggle', line: 2 })
+  applyMutation(doc, { kind: 'delete', line: 2 })
+  applyMutation(doc, { kind: 'add', text: 'two', projectLine: 0 })
+  applyMutation(doc, { kind: 'add-project', title: 'B' })
 
-  assert.deepStrictEqual(doc.lines, ['- [ ] one'])
+  assert.deepStrictEqual(doc.lines, ['## A', '', '- [ ] one'])
   assert.equal(doc.tasks.length, 1)
+})
+
+test('a new project becomes a section at the end of the file', () => {
+  const lines = applyMutation(parseDoc('- [ ] one\n'), { kind: 'add-project', title: 'Release' })
+  assert.deepStrictEqual(lines, ['- [ ] one', '', '## Release', ''])
+})
+
+test('the first project in an empty file does not gain a leading blank line', () => {
+  assert.deepStrictEqual(applyMutation(parseDoc(''), { kind: 'add-project', title: 'Release' }), [
+    '## Release',
+    '',
+  ])
+})
+
+test('renaming a project rewrites only its heading', () => {
+  const source = '## A\n\n- [ ] one\n'
+  const lines = applyMutation(parseDoc(source), { kind: 'rename-project', line: 0, title: 'B' })
+  assert.deepStrictEqual(lines, ['## B', '', '- [ ] one', ''])
+})
+
+test('deleting a project takes its tasks with it', () => {
+  // Without an inbox, leaving them behind would hand them to whichever project
+  // sits above — data teleporting somewhere the user never asked for.
+  const source = '# Tasks\n\n## A\n\n- [ ] one\n\n## B\n\n- [ ] two\n'
+  const doc = parseDoc(source)
+  const lines = applyMutation(doc, { kind: 'delete-project', line: doc.projects[0].line })
+
+  assert.deepStrictEqual(lines, ['# Tasks', '', '## B', '', '- [ ] two', ''])
+})
+
+test('deleting the middle project leaves the others intact', () => {
+  const source = '## A\n\n- [ ] one\n\n## B\n\n- [ ] two\n\n## C\n\n- [ ] three\n'
+  const doc = parseDoc(source)
+  const middle = doc.projects.find((project) => project.title === 'B')!.line
+  const lines = applyMutation(doc, { kind: 'delete-project', line: middle })
+
+  assert.equal(
+    lines.join('\n'),
+    '## A\n\n- [ ] one\n\n## C\n\n- [ ] three\n',
+  )
+})
+
+test('deleting the only project empties the file', () => {
+  const doc = parseDoc('## A\n\n- [ ] one\n')
+  assert.deepStrictEqual(applyMutation(doc, { kind: 'delete-project', line: 0 }), [])
+})
+
+test('the first task in an empty project lands under its heading', () => {
+  const source = '## A\n\n## B\n\n- [ ] two\n'
+  const doc = parseDoc(source)
+  const line = doc.projects.find((project) => project.title === 'A')!.line
+
+  assert.deepStrictEqual(applyMutation(doc, { kind: 'add', text: 'first', projectLine: line }), [
+    '## A',
+    '',
+    '- [ ] first',
+    '',
+    '## B',
+    '',
+    '- [ ] two',
+    '',
+  ])
+})
+
+test('moving a task relocates it into another project', () => {
+  const source = '## A\n\n- [ ] one\n\n## B\n\n- [ ] two\n'
+  const doc = parseDoc(source)
+  const target = doc.tasks.find((task) => task.title === 'one')!.line
+  const into = doc.projects.find((project) => project.title === 'B')!.line
+
+  const moved = parseDoc(applyMutation(doc, { kind: 'move', line: target, projectLine: into }).join('\n'))
+  assert.deepStrictEqual(
+    moved.tasks.map((task) => [task.title, task.projectLine]),
+    [
+      ['two', 3],
+      ['one', 3],
+    ],
+  )
+})
+
+test('a moved task keeps its line exactly as written', () => {
+  // Moving is the one mutation that relocates a whole line, so it is the one
+  // place regenerating would quietly rewrite the author's own formatting.
+  const source = '## A\n\n* [x]   Ship it   #work\n\n## B\n'
+  const doc = parseDoc(source)
+  const into = doc.projects.find((project) => project.title === 'B')!.line
+
+  assert.deepStrictEqual(
+    applyMutation(doc, { kind: 'move', line: doc.tasks[0].line, projectLine: into }),
+    ['## A', '', '', '## B', '', '* [x]   Ship it   #work', ''],
+  )
+})
+
+test('moving a task within its own project changes nothing', () => {
+  const source = '## A\n\n- [ ] one\n'
+  const doc = parseDoc(source)
+  const projectLine = doc.projects[0].line
+
+  assert.deepStrictEqual(
+    applyMutation(doc, { kind: 'move', line: doc.tasks[0].line, projectLine }),
+    doc.lines,
+  )
+})
+
+test('a project name must be unique and non-empty', () => {
+  const doc = parseDoc('## A\n')
+  const isCode = (code: string) => (error: Error & { code?: string }) => error.code === code
+
+  assert.throws(() => applyMutation(doc, { kind: 'add-project', title: ' A ' }), isCode('DUPLICATE_PROJECT'))
+  assert.throws(() => applyMutation(doc, { kind: 'add-project', title: '   ' }), isCode('EMPTY_TASK'))
+  assert.throws(
+    () => applyMutation(parseDoc('## A\n\n## B\n'), { kind: 'rename-project', line: 0, title: 'B' }),
+    isCode('DUPLICATE_PROJECT'),
+  )
+})
+
+test('renaming or deleting a project that is gone is refused', () => {
+  const doc = parseDoc('## A\n\n- [ ] one')
+  const isStale = (error: Error & { code?: string }) => error.code === 'STALE_DOC'
+
+  assert.throws(() => applyMutation(doc, { kind: 'rename-project', line: 2, title: 'B' }), isStale)
+  assert.throws(() => applyMutation(doc, { kind: 'delete-project', line: 99 }), isStale)
+  assert.throws(() => applyMutation(doc, { kind: 'add', text: 'x', projectLine: 99 }), isStale)
 })

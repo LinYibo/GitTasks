@@ -6,7 +6,8 @@ directories:
   output: dist
 
 # Nothing needs to ship in node_modules: main, preload and renderer are all
-# bundled into out/ by electron-vite, and git is spawned from the system.
+# bundled into out/ by electron-vite, and the only runtime dependency is the
+# tasks file itself, read through Node's fs.
 files:
   - out/**
   - package.json

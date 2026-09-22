@@ -2,8 +2,8 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import type { TaskFields } from '../types.ts'
-import { formatTaskLine, serializeDoc, setCompleted } from './format.ts'
-import { parseDoc, parseTaskLine } from './parse.ts'
+import { formatProjectHeading, formatTaskLine, serializeDoc, setCompleted } from './format.ts'
+import { parseDoc, parseProjectHeading, parseTaskLine } from './parse.ts'
 
 const fields = (title: string, overrides: Partial<TaskFields> = {}): TaskFields => ({
   title,
@@ -22,9 +22,9 @@ test('formats a completed task', () => {
 
 test('emits metadata in a fixed order', () => {
   const line = formatTaskLine(
-    fields('Ship it', { tags: ['work', 'urgent'], project: 'GitTasks', priority: 1, due: '2026-09-20' }),
+    fields('Ship it', { tags: ['work', 'urgent'], priority: 1, due: '2026-09-20' }),
   )
-  assert.equal(line, '- [ ] Ship it #work #urgent +GitTasks p1 due:2026-09-20')
+  assert.equal(line, '- [ ] Ship it #work #urgent p1 due:2026-09-20')
 })
 
 test('omits metadata that is absent', () => {
@@ -34,13 +34,13 @@ test('omits metadata that is absent', () => {
 test('round-trips canonical lines unchanged', () => {
   const canonical = [
     '- [ ] Buy milk',
-    '- [x] Ship the release #work #urgent +GitTasks p1 due:2026-09-20',
+    '- [x] Ship the release #work #urgent p1 due:2026-09-20',
     '- [ ] Issue #42 stays in the title',
     '- [ ] Mention owner/repo#42 and C++',
   ]
 
   for (const line of canonical) {
-    const task = parseTaskLine(line, 0)
+    const task = parseTaskLine(line, 0, null)
     assert.ok(task, `expected ${line} to parse as a task`)
     assert.equal(formatTaskLine(task), line)
   }
@@ -49,19 +49,15 @@ test('round-trips canonical lines unchanged', () => {
 test('normalizes a non-dash bullet to the canonical form', () => {
   // `*` and `+` bullets parse fine, but they are not canonical — so rewriting
   // such a line converts it to `-`. Until then the raw line is kept verbatim.
-  assert.equal(formatTaskLine(parseTaskLine('* [ ] Star bullet', 0)!), '- [ ] Star bullet')
-  assert.equal(formatTaskLine(parseTaskLine('+ [x] Plus bullet #a', 0)!), '- [x] Plus bullet #a')
+  assert.equal(formatTaskLine(parseTaskLine('* [ ] Star bullet', 0, null)!), '- [ ] Star bullet')
+  assert.equal(formatTaskLine(parseTaskLine('+ [x] Plus bullet #a', 0, null)!), '- [x] Plus bullet #a')
 })
 
 test('parse(format(fields)) recovers the fields', () => {
-  const original = fields('Ship it', {
-    tags: ['work'],
-    project: 'GitTasks',
-    priority: 2,
-    due: '2026-09-20',
-  })
+  const original = fields('Ship it', { tags: ['work'], priority: 2, due: '2026-09-20' })
 
-  const { line: _line, raw: _raw, ...recovered } = parseTaskLine(formatTaskLine(original), 0)!
+  const { line: _line, raw: _raw, projectLine: _projectLine, ...recovered } =
+    parseTaskLine(formatTaskLine(original), 0, null)!
   assert.deepStrictEqual(recovered, original)
 })
 
@@ -71,10 +67,13 @@ test('serialize preserves every non-task line byte for byte', () => {
     '',
     'Some hand-written notes.',
     '',
+    '## Release',
+    '',
     '- [ ] First #work',
     '- [x] Second',
     '',
     '<!-- a comment -->',
+    '## Backlog   ',
     'A trailing paragraph',
     '',
   ].join('\n')
@@ -82,6 +81,10 @@ test('serialize preserves every non-task line byte for byte', () => {
   const doc = parseDoc(source)
   assert.equal(doc.tasks.length, 2)
   assert.equal(serializeDoc(doc.lines), source)
+})
+
+test('a project heading round-trips through the parser', () => {
+  assert.equal(parseProjectHeading(formatProjectHeading('Release v0.2')), 'Release v0.2')
 })
 
 test('serialize preserves a file with no trailing newline', () => {

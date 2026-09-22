@@ -10,9 +10,9 @@ import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 
 import type { IpcMainInvokeEvent } from 'electron'
 
-import type { OpenTarget, ApplyRequest, SyncMode } from '../shared/ipc-contract.ts'
+import type { ApplyRequest, OpenTarget } from '../shared/ipc-contract.ts'
 import { CHANNELS } from '../shared/ipc-contract.ts'
-import type { RepoState, Result } from '../shared/types.ts'
+import type { FolderState, Result } from '../shared/types.ts'
 import { AppError, toErrorInfo } from './errors.ts'
 import * as session from './session.ts'
 
@@ -28,13 +28,15 @@ function handle<A, R>(run: (arg: A) => R | Promise<R>) {
 
 export function registerIpc(): void {
   ipcMain.handle(CHANNELS.state, handle(() => session.state()))
-  ipcMain.handle(CHANNELS.choose, handle(() => chooseRepo()))
-  ipcMain.handle(CHANNELS.apply, handle((request: ApplyRequest) => session.applyMutation(request.expectedHash, request.mutation)))
-  ipcMain.handle(CHANNELS.sync, handle((mode: SyncMode) => session.sync(mode)))
+  ipcMain.handle(CHANNELS.choose, handle(() => chooseFolder()))
+  ipcMain.handle(
+    CHANNELS.apply,
+    handle((request: ApplyRequest) => session.applyMutation(request.expectedHash, request.mutation)),
+  )
   ipcMain.handle(CHANNELS.open, handle((target: OpenTarget) => open(target)))
 }
 
-async function chooseRepo(): Promise<RepoState | null> {
+async function chooseFolder(): Promise<FolderState | null> {
   const window = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
   if (!window) return null
 
@@ -47,17 +49,17 @@ async function chooseRepo(): Promise<RepoState | null> {
   const [dir] = filePaths
   if (canceled || !dir) return null
 
-  return session.openRepo(dir)
+  return session.openFolder(dir)
 }
 
 /**
  * Hand the user off to their own tools. The whole point of storing tasks as
- * markdown in a git repo is that other programs can work with them.
+ * plain markdown is that other programs can work with them.
  */
 async function open(target: OpenTarget): Promise<void> {
   const path = target === 'folder' ? session.folder() : session.tasksFile()
 
   // `openPath` reports failure by returning a message rather than throwing.
   const failure = await shell.openPath(path)
-  if (failure) throw new AppError('UNKNOWN', failure)
+  if (failure) throw new AppError('IO', failure)
 }

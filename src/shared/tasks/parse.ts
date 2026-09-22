@@ -12,11 +12,16 @@ import type { ParsedDoc, Priority, Task, TaskFields } from '../types.ts'
  */
 const TASK_LINE = /^([-*+])[ \t]+\[([ xX])\][ \t]*(.*)$/
 
+/**
+ * A project. Exactly two hashes: `#` is a document title and `###` a subsection,
+ * and neither should be mistaken for a container of tasks.
+ */
+const PROJECT_HEADING = /^##[ \t]+(.+?)[ \t]*$/
+
 // Metadata is recognised per whitespace-delimited token, anywhere on the line.
 // Tokenising this way is what makes `owner/repo#42` and `C++` safe: neither
-// forms a whole token that starts with `#` or `+`.
+// forms a whole token that starts with `#`.
 const TAG = /^#([\p{L}_][\p{L}\p{N}_-]*)$/u
-const PROJECT = /^\+([\p{L}_][\p{L}\p{N}_-]*)$/u
 const PRIORITY = /^p([1-3])$/
 const DUE = /^due:(\d{4})-(\d{2})-(\d{2})$/i
 
@@ -44,7 +49,6 @@ function isRealDate(year: number, month: number, day: number): boolean {
 export function parseTaskFields(text: string): TaskFields | null {
   const title: string[] = []
   const tags: string[] = []
-  let project: string | undefined
   let priority: Priority | undefined
   let due: string | undefined
 
@@ -60,14 +64,8 @@ export function parseTaskFields(text: string): TaskFields | null {
       continue
     }
 
-    // project / priority / due are singletons. A second occurrence is left in
-    // the title rather than silently swallowed.
-    const proj = PROJECT.exec(word)
-    if (proj && !project) {
-      project = proj[1]
-      continue
-    }
-
+    // priority / due are singletons. A second occurrence is left in the title
+    // rather than silently swallowed.
     const pri = PRIORITY.exec(word)
     if (pri && !priority) {
       priority = Number(pri[1]) as Priority
@@ -87,27 +85,44 @@ export function parseTaskFields(text: string): TaskFields | null {
   }
 
   const joined = title.join(' ')
-  return joined ? { title: joined, completed: false, tags, project, priority, due } : null
+  return joined ? { title: joined, completed: false, tags, priority, due } : null
 }
 
-export function parseTaskLine(raw: string, line: number): Task | null {
+/** The title of a `## heading` line, or null if the line is not one. */
+export function parseProjectHeading(raw: string): string | null {
+  return PROJECT_HEADING.exec(raw)?.[1] ?? null
+}
+
+export function parseTaskLine(raw: string, line: number, projectLine: number | null): Task | null {
   const match = TASK_LINE.exec(raw)
   if (!match) return null
 
   const fields = parseTaskFields(match[3])
   if (!fields) return null
 
-  return { line, raw, ...fields, completed: match[2] !== ' ' }
+  return { line, raw, projectLine, ...fields, completed: match[2] !== ' ' }
 }
 
 export function parseDoc(text: string): ParsedDoc {
   const lines = normalizeEol(text).split('\n')
+  const projects: ParsedDoc['projects'] = []
   const tasks: Task[] = []
 
-  lines.forEach((line, index) => {
-    const task = parseTaskLine(line, index)
+  // A task belongs to the nearest `## heading` above it. One above the first
+  // heading belongs to no project, and stays null so nothing claims it.
+  let projectLine: number | null = null
+
+  lines.forEach((raw, index) => {
+    const title = parseProjectHeading(raw)
+    if (title !== null) {
+      projects.push({ line: index, title })
+      projectLine = index
+      return
+    }
+
+    const task = parseTaskLine(raw, index, projectLine)
     if (task) tasks.push(task)
   })
 
-  return { lines, tasks }
+  return { lines, projects, tasks }
 }

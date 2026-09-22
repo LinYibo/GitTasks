@@ -1,9 +1,10 @@
-import { useStore } from '../store.ts'
+import { tasksOf, useStore } from '../store.ts'
 
 export function CountLine() {
-  const tasks = useStore((state) => state.doc.tasks)
+  const doc = useStore((state) => state.doc)
+  const selected = useStore((state) => state.selectedProject)
 
-  return <p className="text-sm text-muted tabular-nums">{describe(tasks)}</p>
+  return <p className="text-sm text-muted tabular-nums">{describe(tasksOf(doc, selected))}</p>
 }
 
 function describe(tasks: { completed: boolean }[]): string {

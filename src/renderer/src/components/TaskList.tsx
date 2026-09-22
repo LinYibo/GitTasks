@@ -1,16 +1,17 @@
 import type { Filter } from '../store.ts'
-import { useStore } from '../store.ts'
+import type { Task } from '../../../shared/types.ts'
+import { tasksOf, useStore } from '../store.ts'
 import { EmptyState } from './EmptyState.tsx'
 import { TaskRow } from './TaskRow.tsx'
 
 const EMPTY_COPY: Record<Filter, { title: string; description: string }> = {
   all: {
-    title: 'Nothing here yet',
-    description: 'Add your first task above to get started.',
+    title: 'No tasks in this project',
+    description: 'Add one above. Each task is a checkbox line under the project heading.',
   },
   active: {
     title: 'Nothing left to do',
-    description: 'Every task is checked off.',
+    description: 'Every task in this project is checked off.',
   },
   done: {
     title: 'Nothing completed yet',
@@ -18,13 +19,18 @@ const EMPTY_COPY: Record<Filter, { title: string; description: string }> = {
   },
 }
 
-export function TaskList() {
-  const tasks = useStore((state) => state.doc.tasks)
-  const filter = useStore((state) => state.filter)
-
-  const visible = tasks.filter((task) =>
+function byStatus(tasks: Task[], filter: Filter): Task[] {
+  return tasks.filter((task) =>
     filter === 'active' ? !task.completed : filter === 'done' ? task.completed : true,
   )
+}
+
+export function TaskList() {
+  const doc = useStore((state) => state.doc)
+  const filter = useStore((state) => state.filter)
+  const selected = useStore((state) => state.selectedProject)
+
+  const visible = byStatus(tasksOf(doc, selected), filter)
 
   if (visible.length === 0) return <EmptyState {...EMPTY_COPY[filter]} />
 
