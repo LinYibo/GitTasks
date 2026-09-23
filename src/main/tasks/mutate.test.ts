@@ -35,7 +35,7 @@ test('a task is never written into the project below', () => {
   ])
 })
 
-test('adds a task with metadata already parsed', () => {
+test('adds a task with its text kept as written', () => {
   const lines = applyMutation(parseDoc('## A\n'), {
     kind: 'add',
     text: 'Ship it #work p1 due:2026-09-20',
@@ -46,7 +46,7 @@ test('adds a task with metadata already parsed', () => {
 
 test('rejects a task with no title', () => {
   assert.throws(
-    () => applyMutation(parseDoc('## A\n'), { kind: 'add', text: '  #urgent  ', projectLine: 0 }),
+    () => applyMutation(parseDoc('## A\n'), { kind: 'add', text: '   ', projectLine: 0 }),
     (error: Error & { code?: string }) => error.code === 'EMPTY_TASK',
   )
 })
@@ -75,7 +75,7 @@ test('editing canonicalizes only the line it touches', () => {
 
 test('rejects an edit that would leave no title', () => {
   assert.throws(
-    () => applyMutation(parseDoc('- [ ] one'), { kind: 'edit', line: 0, text: '#tag' }),
+    () => applyMutation(parseDoc('- [ ] one'), { kind: 'edit', line: 0, text: '  ' }),
     (error: Error & { code?: string }) => error.code === 'EMPTY_TASK',
   )
 })
@@ -167,46 +167,6 @@ test('the first task in an empty project lands under its heading', () => {
     '- [ ] two',
     '',
   ])
-})
-
-test('moving a task relocates it into another project', () => {
-  const source = '## A\n\n- [ ] one\n\n## B\n\n- [ ] two\n'
-  const doc = parseDoc(source)
-  const target = doc.tasks.find((task) => task.title === 'one')!.line
-  const into = doc.projects.find((project) => project.title === 'B')!.line
-
-  const moved = parseDoc(applyMutation(doc, { kind: 'move', line: target, projectLine: into }).join('\n'))
-  assert.deepStrictEqual(
-    moved.tasks.map((task) => [task.title, task.projectLine]),
-    [
-      ['two', 3],
-      ['one', 3],
-    ],
-  )
-})
-
-test('a moved task keeps its line exactly as written', () => {
-  // Moving is the one mutation that relocates a whole line, so it is the one
-  // place regenerating would quietly rewrite the author's own formatting.
-  const source = '## A\n\n* [x]   Ship it   #work\n\n## B\n'
-  const doc = parseDoc(source)
-  const into = doc.projects.find((project) => project.title === 'B')!.line
-
-  assert.deepStrictEqual(
-    applyMutation(doc, { kind: 'move', line: doc.tasks[0].line, projectLine: into }),
-    ['## A', '', '', '## B', '', '* [x]   Ship it   #work', ''],
-  )
-})
-
-test('moving a task within its own project changes nothing', () => {
-  const source = '## A\n\n- [ ] one\n'
-  const doc = parseDoc(source)
-  const projectLine = doc.projects[0].line
-
-  assert.deepStrictEqual(
-    applyMutation(doc, { kind: 'move', line: doc.tasks[0].line, projectLine }),
-    doc.lines,
-  )
 })
 
 test('a project name must be unique and non-empty', () => {

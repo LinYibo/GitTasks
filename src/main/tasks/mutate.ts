@@ -6,7 +6,7 @@
 import type { Mutation, ParsedDoc, Project, Task } from '../../shared/types.ts'
 import { AppError } from '../errors.ts'
 import { formatProjectHeading, formatTaskLine, setCompleted } from '../../shared/tasks/format.ts'
-import { parseDoc, parseProjectHeading, parseTaskFields } from '../../shared/tasks/parse.ts'
+import { parseProjectHeading } from '../../shared/tasks/parse.ts'
 
 export function applyMutation(doc: ParsedDoc, mutation: Mutation): string[] {
   switch (mutation.kind) {
@@ -24,8 +24,6 @@ export function applyMutation(doc: ParsedDoc, mutation: Mutation): string[] {
       return editTask(doc, mutation.line, mutation.text)
     case 'delete':
       return deleteTask(doc, mutation.line)
-    case 'move':
-      return moveTask(doc, mutation.line, mutation.projectLine)
   }
 }
 
@@ -74,10 +72,10 @@ function projectAt(doc: ParsedDoc, line: number): Project {
   return project
 }
 
-function titleFields(text: string) {
-  const fields = parseTaskFields(text)
-  if (!fields) throw new AppError('EMPTY_TASK', 'A task needs a title.')
-  return fields
+function taskTitle(text: string): string {
+  const title = text.trim()
+  if (!title) throw new AppError('EMPTY_TASK', 'A task needs a title.')
+  return title
 }
 
 function projectTitle(text: string): string {
@@ -134,10 +132,14 @@ function deleteProject(doc: ParsedDoc, line: number): string[] {
 }
 
 function addTask(doc: ParsedDoc, text: string, projectLine: number): string[] {
-  const fields = titleFields(text)
+  const title = taskTitle(text)
   projectAt(doc, projectLine)
 
-  return insertTask([...doc.lines], insertionIndex(doc, projectLine), formatTaskLine(fields))
+  return insertTask(
+    [...doc.lines],
+    insertionIndex(doc, projectLine),
+    formatTaskLine({ title, completed: false }),
+  )
 }
 
 function toggleTask(doc: ParsedDoc, line: number): string[] {
@@ -150,35 +152,11 @@ function toggleTask(doc: ParsedDoc, line: number): string[] {
 function editTask(doc: ParsedDoc, line: number, text: string): string[] {
   const task = taskAt(doc, line)
   const lines = [...doc.lines]
-  lines[line] = formatTaskLine({ ...titleFields(text), completed: task.completed })
+  lines[line] = formatTaskLine({ title: taskTitle(text), completed: task.completed })
   return lines
 }
 
 function deleteTask(doc: ParsedDoc, line: number): string[] {
   const target = taskAt(doc, line)
   return doc.lines.filter((_, index) => index !== target.line)
-}
-
-/**
- * Relocate a task to another project. The document is re-derived once the line
- * is out, so the insertion point is measured against the remaining tasks rather
- * than indices that the removal has already invalidated.
- */
-function moveTask(doc: ParsedDoc, line: number, projectLine: number): string[] {
-  const task = taskAt(doc, line)
-  if (task.projectLine === projectLine) return [...doc.lines]
-
-  projectAt(doc, projectLine)
-
-  const without = doc.lines.filter((_, index) => index !== task.line)
-  const remaining = parseDoc(without.join('\n'))
-
-  // Taking a line out renumbers everything below it, so a destination further
-  // down the file has to be tracked across the removal.
-  const destination = task.line < projectLine ? projectLine - 1 : projectLine
-
-  return keepTrailingNewline(
-    doc,
-    insertTask([...without], insertionIndex(remaining, destination), task.raw),
-  )
 }

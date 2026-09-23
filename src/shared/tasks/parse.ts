@@ -4,7 +4,7 @@
  * Pure: no `fs`, no Electron. Everything here is unit-tested by `node --test`.
  */
 
-import type { ParsedDoc, Priority, Task, TaskFields } from '../types.ts'
+import type { ParsedDoc, Task } from '../types.ts'
 
 /**
  * A checkbox line. Only indent-0 lines are tasks, so the bullet must be the
@@ -18,74 +18,9 @@ const TASK_LINE = /^([-*+])[ \t]+\[([ xX])\][ \t]*(.*)$/
  */
 const PROJECT_HEADING = /^##[ \t]+(.+?)[ \t]*$/
 
-// Metadata is recognised per whitespace-delimited token, anywhere on the line.
-// Tokenising this way is what makes `owner/repo#42` and `C++` safe: neither
-// forms a whole token that starts with `#`.
-const TAG = /^#([\p{L}_][\p{L}\p{N}_-]*)$/u
-const PRIORITY = /^p([1-3])$/
-const DUE = /^due:(\d{4})-(\d{2})-(\d{2})$/i
-
 /** CRLF and lone CR both collapse to LF so hashing and diffs stay stable. */
 export function normalizeEol(text: string): string {
   return text.replace(/\r\n?/g, '\n')
-}
-
-function isRealDate(year: number, month: number, day: number): boolean {
-  const date = new Date(Date.UTC(year, month - 1, day))
-  return (
-    date.getUTCFullYear() === year &&
-    date.getUTCMonth() === month - 1 &&
-    date.getUTCDate() === day
-  )
-}
-
-/**
- * Split a task's text into its title and metadata.
- *
- * Returns `null` when nothing is left once metadata is removed — a task made
- * only of metadata has no title, and the caller should treat the line as
- * non-task content rather than write an empty one.
- */
-export function parseTaskFields(text: string): TaskFields | null {
-  const title: string[] = []
-  const tags: string[] = []
-  let priority: Priority | undefined
-  let due: string | undefined
-
-  for (const word of text.split(/\s+/)) {
-    if (!word) continue
-
-    const tag = TAG.exec(word)
-    if (tag) {
-      // Tags are a set: `#Home #home` collapses to one.
-      if (!tags.some((existing) => existing.toLowerCase() === tag[1].toLowerCase())) {
-        tags.push(tag[1])
-      }
-      continue
-    }
-
-    // priority / due are singletons. A second occurrence is left in the title
-    // rather than silently swallowed.
-    const pri = PRIORITY.exec(word)
-    if (pri && !priority) {
-      priority = Number(pri[1]) as Priority
-      continue
-    }
-
-    const date = DUE.exec(word)
-    if (date && !due) {
-      const [year, month, day] = [Number(date[1]), Number(date[2]), Number(date[3])]
-      if (isRealDate(year, month, day)) {
-        due = `${date[1]}-${date[2]}-${date[3]}`
-        continue
-      }
-    }
-
-    title.push(word)
-  }
-
-  const joined = title.join(' ')
-  return joined ? { title: joined, completed: false, tags, priority, due } : null
 }
 
 /** The title of a `## heading` line, or null if the line is not one. */
@@ -93,14 +28,18 @@ export function parseProjectHeading(raw: string): string | null {
   return PROJECT_HEADING.exec(raw)?.[1] ?? null
 }
 
+/**
+ * A checkbox with nothing after it has no title, and is treated as non-task
+ * content rather than claimed as an empty task.
+ */
 export function parseTaskLine(raw: string, line: number, projectLine: number | null): Task | null {
   const match = TASK_LINE.exec(raw)
   if (!match) return null
 
-  const fields = parseTaskFields(match[3])
-  if (!fields) return null
+  const title = match[3].trim()
+  if (!title) return null
 
-  return { line, raw, projectLine, ...fields, completed: match[2] !== ' ' }
+  return { line, raw, projectLine, title, completed: match[2] !== ' ' }
 }
 
 export function parseDoc(text: string): ParsedDoc {

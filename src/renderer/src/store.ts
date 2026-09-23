@@ -8,7 +8,6 @@
 
 import { create } from 'zustand'
 
-import { taskToText } from '../../shared/tasks/format.ts'
 import type { Doc, ErrorInfo, FolderState, Mutation, Result, Task } from '../../shared/types.ts'
 import { api } from './api.ts'
 
@@ -51,7 +50,6 @@ type Actions = {
   addTask(): Promise<void>
   toggleTask(line: number): Promise<void>
   removeTask(line: number): Promise<void>
-  moveTask(line: number, destination: string): Promise<void>
   beginEdit(line: number): void
   setEditDraft(text: string): void
   commitEdit(): Promise<void>
@@ -112,7 +110,7 @@ export const useStore = create<State & Actions>()((set, get) => {
     ready: false,
     folderPath: null,
     doc: EMPTY_DOC,
-    filter: 'all',
+    filter: 'active',
     selectedProject: null,
     composerText: '',
     editingLine: null,
@@ -128,7 +126,7 @@ export const useStore = create<State & Actions>()((set, get) => {
       await call(api.choose(), (state) => {
         // A cancelled picker resolves to null; leave everything as it was.
         // The new folder's own first project is chosen by `adopt`.
-        if (state) adopt(state, { filter: 'all', selectedProject: null })
+        if (state) adopt(state, { filter: 'active', selectedProject: null })
       })
     },
 
@@ -174,8 +172,8 @@ export const useStore = create<State & Actions>()((set, get) => {
       const projectLine = selectedLine()
       if (projectLine === null) return
 
-      // Cleared only on success, so a rejected task — metadata with no title,
-      // say — doesn't discard what the user typed.
+      // Cleared only on success, so a rejected task — an empty title, say —
+      // doesn't discard what the user typed.
       await mutate({ kind: 'add', text, projectLine }, { composerText: '' })
     },
 
@@ -194,27 +192,11 @@ export const useStore = create<State & Actions>()((set, get) => {
       await mutate({ kind: 'delete', line }, extra)
     },
 
-    async moveTask(line, destination) {
-      const projectLine = get().doc.projects.find((project) => project.title === destination)?.line
-      if (projectLine === undefined) return
-
-      // A move renumbers every line between the old and the new home, so an
-      // edit anchored to anything at or after the moved task is no longer
-      // pointing where it was.
-      const { editingLine } = get()
-      const extra =
-        editingLine !== null && editingLine >= line ? { editingLine: null, editDraft: '' } : {}
-
-      await mutate({ kind: 'move', line, projectLine }, extra)
-    },
-
     beginEdit(line) {
       const task = get().doc.tasks.find((candidate) => candidate.line === line)
       if (!task) return
 
-      // Pre-filled with the same inline syntax the file uses, so the editor
-      // needs no separate widgets for tags, priority or dates.
-      set({ editingLine: line, editDraft: taskToText(task) })
+      set({ editingLine: line, editDraft: task.title })
     },
 
     setEditDraft: (editDraft) => set({ editDraft }),
@@ -224,7 +206,7 @@ export const useStore = create<State & Actions>()((set, get) => {
       if (editingLine === null) return
 
       // An emptied box means the user changed their mind, not that they want an
-      // error. A draft of metadata with no title still reports one.
+      // error.
       if (!editDraft.trim()) {
         set({ editingLine: null, editDraft: '' })
         return

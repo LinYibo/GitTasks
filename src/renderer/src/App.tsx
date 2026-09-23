@@ -3,7 +3,6 @@ import { useEffect } from 'react'
 import { api } from './api.ts'
 import { Backdrop } from './components/Backdrop.tsx'
 import { Composer } from './components/Composer.tsx'
-import { CountLine } from './components/CountLine.tsx'
 import { ErrorBanner } from './components/ErrorBanner.tsx'
 import { EmptyState } from './components/EmptyState.tsx'
 import { FilterTabs } from './components/FilterTabs.tsx'
@@ -81,10 +80,7 @@ function Tasks() {
 function ProjectHeading({ project }: { project: string }) {
   return (
     <header className="flex flex-wrap items-center justify-between gap-3">
-      <div className="flex min-w-0 flex-col gap-1">
-        <h1 className="truncate text-xl font-semibold tracking-tight text-fg">{project}</h1>
-        <CountLine />
-      </div>
+      <h1 className="min-w-0 truncate text-xl font-semibold tracking-tight text-fg">{project}</h1>
 
       <FilterTabs />
     </header>

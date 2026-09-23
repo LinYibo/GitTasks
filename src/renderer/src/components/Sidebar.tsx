@@ -98,15 +98,13 @@ function ProjectRow({
     )
   }
 
-  const open = tasks.filter((task) => !task.completed).length
-
   return (
-    <div className="group/row relative">
+    <div className="group/row relative flex items-center">
       <button
         type="button"
         onClick={() => selectProject(project.title)}
         aria-current={selected ? 'true' : undefined}
-        className={`flex h-9 w-full items-center gap-2 rounded-lg px-2.5 text-sm transition-colors duration-150 ${
+        className={`flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 text-sm transition-colors duration-150 ${
           selected ? 'bg-surface-elevated font-medium text-fg' : 'text-muted hover:bg-surface hover:text-fg'
         }`}
       >
@@ -117,16 +115,12 @@ function ProjectRow({
           />
         )}
         <span className="min-w-0 flex-1 truncate text-left">{project.title}</span>
-
-        {/* The count gives way to the row's actions on hover. */}
-        {tasks.length > 0 && (
-          <span className="shrink-0 text-xs tabular-nums text-subtle transition-opacity duration-150 group-hover/row:opacity-0">
-            {open}
-          </span>
-        )}
       </button>
 
-      <div className="absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover/row:opacity-100 focus-within:opacity-100">
+      {/* Actions sit beside the title rather than over it, so a long name
+          truncates instead of hiding them. They keep their slot when invisible
+          to avoid shifting the row on hover. */}
+      <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity duration-150 pointer-events-none group-hover/row:opacity-100 group-hover/row:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto">
         <IconButton label={`Rename ${project.title}`} onClick={() => setRenaming(true)}>
           <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
         </IconButton>

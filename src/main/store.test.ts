@@ -56,7 +56,7 @@ test('normalises CRLF on the way in, and always writes LF', async () => {
   assert.equal(await readFile(join(dir, TASKS_FILE), 'utf8'), '- [ ] One\n- [x] Two\n')
 })
 
-test('round-trips the task metadata through the file', async () => {
+test('round-trips a task line through the file verbatim', async () => {
   const dir = await tempDir()
   const doc = await writeTasksFile(dir, ['- [ ] Buy milk #home #errand p1 due:2026-09-20'])
 

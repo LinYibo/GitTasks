@@ -5,36 +5,20 @@ import type { TaskFields } from '../types.ts'
 import { formatProjectHeading, formatTaskLine, serializeDoc, setCompleted } from './format.ts'
 import { parseDoc, parseProjectHeading, parseTaskLine } from './parse.ts'
 
-const fields = (title: string, overrides: Partial<TaskFields> = {}): TaskFields => ({
-  title,
-  completed: false,
-  tags: [],
-  ...overrides,
-})
+const fields = (title: string, completed = false): TaskFields => ({ title, completed })
 
 test('formats a bare task', () => {
   assert.equal(formatTaskLine(fields('Buy milk')), '- [ ] Buy milk')
 })
 
 test('formats a completed task', () => {
-  assert.equal(formatTaskLine(fields('Buy milk', { completed: true })), '- [x] Buy milk')
-})
-
-test('emits metadata in a fixed order', () => {
-  const line = formatTaskLine(
-    fields('Ship it', { tags: ['work', 'urgent'], priority: 1, due: '2026-09-20' }),
-  )
-  assert.equal(line, '- [ ] Ship it #work #urgent p1 due:2026-09-20')
-})
-
-test('omits metadata that is absent', () => {
-  assert.equal(formatTaskLine(fields('Thing', { priority: 3 })), '- [ ] Thing p3')
+  assert.equal(formatTaskLine(fields('Buy milk', true)), '- [x] Buy milk')
 })
 
 test('round-trips canonical lines unchanged', () => {
   const canonical = [
     '- [ ] Buy milk',
-    '- [x] Ship the release #work #urgent p1 due:2026-09-20',
+    '- [x] Ship the release',
     '- [ ] Issue #42 stays in the title',
     '- [ ] Mention owner/repo#42 and C++',
   ]
@@ -50,11 +34,11 @@ test('normalizes a non-dash bullet to the canonical form', () => {
   // `*` and `+` bullets parse fine, but they are not canonical — so rewriting
   // such a line converts it to `-`. Until then the raw line is kept verbatim.
   assert.equal(formatTaskLine(parseTaskLine('* [ ] Star bullet', 0, null)!), '- [ ] Star bullet')
-  assert.equal(formatTaskLine(parseTaskLine('+ [x] Plus bullet #a', 0, null)!), '- [x] Plus bullet #a')
+  assert.equal(formatTaskLine(parseTaskLine('+ [x] Plus bullet', 0, null)!), '- [x] Plus bullet')
 })
 
 test('parse(format(fields)) recovers the fields', () => {
-  const original = fields('Ship it', { tags: ['work'], priority: 2, due: '2026-09-20' })
+  const original = fields('Ship it')
 
   const { line: _line, raw: _raw, projectLine: _projectLine, ...recovered } =
     parseTaskLine(formatTaskLine(original), 0, null)!

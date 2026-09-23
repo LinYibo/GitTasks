@@ -4,8 +4,6 @@
  * This file must stay free of `node:` imports — the renderer bundles it.
  */
 
-export type Priority = 1 | 2 | 3
-
 /** A project: one `## heading` in the document, holding any number of tasks. */
 export type Project = {
   title: string
@@ -17,10 +15,6 @@ export type Project = {
 export type TaskFields = {
   title: string
   completed: boolean
-  tags: string[]
-  priority?: Priority
-  /** `YYYY-MM-DD`, validated as a real calendar date */
-  due?: string
 }
 
 /** A task as it appears in the document. */
@@ -61,7 +55,6 @@ export type Mutation =
   | { kind: 'toggle'; line: number }
   | { kind: 'edit'; line: number; text: string }
   | { kind: 'delete'; line: number }
-  | { kind: 'move'; line: number; projectLine: number }
 
 export type ErrCode =
   | 'NOT_OPEN'

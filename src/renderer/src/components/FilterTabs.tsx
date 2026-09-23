@@ -2,9 +2,9 @@ import { useStore } from '../store.ts'
 import type { Filter } from '../store.ts'
 
 const FILTERS: { id: Filter; label: string }[] = [
-  { id: 'all', label: 'All' },
   { id: 'active', label: 'Active' },
   { id: 'done', label: 'Done' },
+  { id: 'all', label: 'All' },
 ]
 
 export function FilterTabs() {

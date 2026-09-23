@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { normalizeEol, parseDoc, parseProjectHeading, parseTaskFields, parseTaskLine } from './parse.ts'
+import { normalizeEol, parseDoc, parseProjectHeading, parseTaskLine } from './parse.ts'
 
 const parse = (line: string) => parseTaskLine(line, 0, null)
 
@@ -11,10 +11,7 @@ test('parses a plain incomplete task', () => {
     raw: '- [ ] Buy milk',
     title: 'Buy milk',
     completed: false,
-    tags: [],
     projectLine: null,
-    priority: undefined,
-    due: undefined,
   })
 })
 
@@ -43,82 +40,21 @@ test('ignores lines that are not checkboxes', () => {
   assert.equal(parse(''), null)
 })
 
-test('extracts inline metadata', () => {
-  const task = parse('- [ ] Ship the release #work #urgent p1 due:2026-09-20')
-  assert.deepStrictEqual(
-    { title: task?.title, tags: task?.tags, priority: task?.priority, due: task?.due },
-    { title: 'Ship the release', tags: ['work', 'urgent'], priority: 1, due: '2026-09-20' },
-  )
-})
-
-test('recognises metadata anywhere on the line, not just at the end', () => {
-  assert.equal(parse('- [ ] #work Ship the release')?.title, 'Ship the release')
-  assert.equal(parse('- [ ] Ship #work the release')?.title, 'Ship the release')
-})
-
-test('leaves `Fix issue #42` alone', () => {
-  // A tag name must start with a letter or underscore, so `#42` is not a tag.
-  assert.deepStrictEqual(parseTaskFields('Fix issue #42'), {
-    title: 'Fix issue #42',
-    completed: false,
-    tags: [],
-    priority: undefined,
-    due: undefined,
-  })
-})
-
-test('leaves `owner/repo#42` alone', () => {
-  // Metadata is matched per whitespace-delimited token, so the `#` is not at
-  // the start of one.
-  assert.equal(parse('- [ ] See owner/repo#42')?.tags.length, 0)
-  assert.equal(parse('- [ ] See owner/repo#42')?.title, 'See owner/repo#42')
-})
-
-test('leaves `C++` alone', () => {
+test('the whole text after the checkbox is the title', () => {
+  // Former metadata tokens are just words the author typed.
+  assert.equal(parse('- [ ] Ship the release #work p1 due:2026-09-20')?.title, 'Ship the release #work p1 due:2026-09-20')
+  assert.equal(parse('- [ ] Fix issue #42')?.title, 'Fix issue #42')
+  assert.equal(parse('- [ ] Buy #2 pencils')?.title, 'Buy #2 pencils')
   assert.equal(parse('- [ ] Learn C++')?.title, 'Learn C++')
 })
 
-test('leaves an old `+project` token in the title', () => {
-  // Projects became `## headings`, so a token the app used to claim is now
-  // just words the author typed.
-  assert.equal(parse('- [ ] Ship it +GitTasks')?.title, 'Ship it +GitTasks')
+test('trims the title but keeps its internal spacing', () => {
+  assert.equal(parse('- [ ]   Weird    spacing  ')?.title, 'Weird    spacing')
 })
 
-test('leaves `#2 pencils` alone', () => {
-  assert.equal(parse('- [ ] Buy #2 pencils')?.tags.length, 0)
-  assert.equal(parse('- [ ] Buy #2 pencils')?.title, 'Buy #2 pencils')
-})
-
-test('rejects an impossible calendar date', () => {
-  // 2026-02-30 does not exist, so it stays in the title rather than becoming a due date.
-  assert.equal(parse('- [ ] Pay rent due:2026-02-30')?.due, undefined)
-  assert.equal(parse('- [ ] Pay rent due:2026-02-30')?.title, 'Pay rent due:2026-02-30')
-})
-
-test('accepts a leap day', () => {
-  assert.equal(parse('- [ ] Party due:2028-02-29')?.due, '2028-02-29')
-})
-
-test('collapses duplicate tags case-insensitively', () => {
-  assert.deepStrictEqual(parse('- [ ] Thing #Home #home')?.tags, ['Home'])
-})
-
-test('keeps a repeated singleton metadata token in the title', () => {
-  // Dropping the second `p2` would silently lose text the author typed.
-  const task = parse('- [ ] Thing p1 p2')
-  assert.equal(task?.priority, 1)
-  assert.equal(task?.title, 'Thing p2')
-})
-
-test('only matches lowercase priorities', () => {
-  // Narrowing the match keeps `P1` usable in prose. It stays a title word.
-  assert.equal(parse('- [ ] Version P1')?.priority, undefined)
-  assert.equal(parse('- [ ] Version P1')?.title, 'Version P1')
-})
-
-test('returns null for a task with no title once metadata is stripped', () => {
-  assert.equal(parse('- [ ] #urgent'), null)
-  assert.equal(parse('- [ ] due:2026-09-20'), null)
+test('returns null for a checkbox with no title', () => {
+  assert.equal(parse('- [ ]'), null)
+  assert.equal(parse('- [ ]   '), null)
 })
 
 test('preserves the raw line verbatim', () => {
