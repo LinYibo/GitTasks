@@ -1,0 +1,10 @@
+# Copy to .dev.vars for `wrangler dev` (npm run dev:cf, serves the site and
+# the OAuth callback together on http://localhost:8787). It is gitignored.
+#
+# APP_URL is where OAuth sends the user back:
+#   - http://localhost:8787  when you use the wrangler-dev site itself
+#   - http://localhost:5177  when you develop against `npm run dev` (Vite HMR)
+# Set APP_URL to the local origin your Vite dev server is actually on —
+# `npm run dev` prints it (it moves off 5173 when the port is taken).
+APP_URL=http://localhost:8787
+GITHUB_CLIENT_SECRET=your-oauth-app-client-secret

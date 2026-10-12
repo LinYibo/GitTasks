@@ -26,33 +26,31 @@ boundary — deploy to a host you control over HTTPS.
 ### Sign in with GitHub (OAuth)
 
 GitHub's token exchange requires the OAuth App's client secret, which a static
-site cannot hold. A tiny proxy Worker (in `worker/`) holds the secret and does
+site cannot hold. A small proxy Worker (in `worker/`) holds the secret and does
 that one call; the app itself stays static. One-time setup:
 
 1. Create an **OAuth App** at [github.com/settings/developers](https://github.com/settings/developers)
    (not a GitHub App). Homepage URL: `https://gittasks.com`. Authorization callback
    URL: `https://gittasks.com/oauth/callback`. Note the client ID and generate a
    client secret.
-2. Deploy the proxy Worker (the route binding in `wrangler.toml` serves it at
-   `gittasks.com/oauth/callback`; the gittasks.com zone must be on Cloudflare):
+2. Store the secret in the Worker (the app and the proxy deploy as one Worker
+   via the root `wrangler.jsonc`):
    ```bash
-   cd worker
    npm install
-   # edit wrangler.toml: GITHUB_CLIENT_ID (APP_URL is already gittasks.com)
    npx wrangler login
    npx wrangler secret put GITHUB_CLIENT_SECRET
-   npm run deploy
    ```
-3. Build the app with the OAuth config in `.env.local`:
-   ```
-   VITE_GITHUB_CLIENT_ID=<client id>
-   VITE_OAUTH_PROXY_URL=https://gittasks.com/oauth
-   ```
+   and fill in the real client ID — either edit `GITHUB_CLIENT_ID` in
+   `wrangler.jsonc` / `VITE_GITHUB_CLIENT_ID` in `.env.production`, or set
+   `VITE_GITHUB_CLIENT_ID` as an environment variable on the build (the
+   environment takes precedence).
 
-For local development, run the Worker with `wrangler dev` (port 8787) — copy
-`worker/.dev.vars.example` to `worker/.dev.vars` first, and add a second
-callback `http://localhost:8787/callback` to the OAuth App — then point
-`VITE_OAUTH_PROXY_URL=http://localhost:8787` in `.env.local`.
+For local development with OAuth, copy `.dev.vars.example` to `.dev.vars`,
+add a second callback `http://localhost:8787/callback` to the OAuth App, and
+run `npm run dev:cf` — the site and the callback together on port 8787. For
+fast iteration without OAuth, `npm run dev` (Vite HMR) with
+`VITE_OAUTH_PROXY_URL=http://localhost:8787` in `.env.local` works too; the
+page is served from Vite while the callback still hits wrangler dev.
 
 ### Pasting a token instead
 
@@ -85,9 +83,15 @@ npm run build        # production build into dist/
 
 ## Deployment
 
-`npm run build` produces a fully static `dist/`. Serve it from any static
-host — GitHub Pages, Cloudflare Pages, Netlify, or a plain web server. Asset
-paths are relative, so no build-time configuration is needed for subpaths.
+The site and the OAuth proxy deploy together as **one Cloudflare Worker with
+static assets** (root `wrangler.jsonc`): `npm run build` produces `dist/`,
+and `npx wrangler deploy` ships the assets plus the callback handler to the
+`gittasks.com/*` route. That is the entire Cloudflare Workers Builds
+pipeline — build command `npm run build`, deploy command `npx wrangler deploy`.
+
+Requirements on the Cloudflare side: the gittasks.com zone on Cloudflare with
+a proxied DNS record for the apex. If the hostname was previously served by a
+Pages project, detach that custom domain so the Worker route can take over.
 
 ## License
 

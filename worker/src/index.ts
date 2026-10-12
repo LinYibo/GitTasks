@@ -2,10 +2,16 @@
  * OAuth authorization-code proxy for GitTasks.
  *
  * GitHub's token exchange requires the client secret, which the static app
- * cannot hold, so this Worker does that one call. The flow it serves:
+ * cannot hold, so the deployed Worker does that one call. The same Worker
+ * also serves the site itself (wrangler.jsonc hands out dist/ as static
+ * assets); `run_worker_first` means this fetch handler is invoked for exactly
+ * one path, /oauth/callback — every other request is answered from assets
+ * and never reaches here.
+ *
+ * The flow it serves:
  *
  *   app → github.com/login/oauth/authorize (redirect_uri = this Worker)
- *   GitHub → this Worker /callback?code=…&state=…
+ *   GitHub → this Worker /oauth/callback?code=…&state=…
  *   Worker → github.com/login/oauth/access_token (secret lives here)
  *   Worker → app/#token=…&state=…   (fragment: never hits any server log)
  *

@@ -10,6 +10,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "dev:cf": "wrangler dev",
+    "deploy": "wrangler deploy",
     "typecheck": "tsc --build",
     "test": "node --test \"src/**/*.test.ts\""
   },
@@ -27,6 +29,7 @@
     "@vitejs/plugin-react": "^5.2.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
-    "vite": "^7.3.6"
+    "vite": "^7.3.6",
+    "wrangler": "^4.149.0"
   }
 }

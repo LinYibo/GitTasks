@@ -1,0 +1,31 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "gittasks",
+  "compatibility_date": "2026-09-01",
+
+  // One Worker, two jobs: serve the built SPA from dist/, and handle the
+  // OAuth callback. Static assets are matched first; the Worker script only
+  // runs for the paths listed in run_worker_first.
+  "main": "worker/src/index.ts",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/oauth/callback"]
+  },
+
+  // The zone must be on Cloudflare with a proxied DNS record for the apex.
+  "routes": [
+    { "pattern": "gittasks.com/*", "zone_name": "gittasks.com" }
+  ],
+
+  "vars": {
+    // From your OAuth App at github.com/settings/developers.
+    "GITHUB_CLIENT_ID": "replace-me",
+    // Where the app itself is served from; OAuth returns here.
+    "APP_URL": "https://gittasks.com"
+  }
+
+  // GITHUB_CLIENT_SECRET is deliberately not a var — it is a secret:
+  //   npx wrangler secret put GITHUB_CLIENT_SECRET
+  // Locally with `wrangler dev`, copy .dev.vars.example to .dev.vars instead.
+}
