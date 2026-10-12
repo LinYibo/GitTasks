@@ -3,9 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="./favicon.ico" sizes="32x32" />
+    <link rel="icon" href="./icon-512.png" type="image/png" sizes="512x512" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: http://localhost:*"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://api.github.com ws: http://localhost:*"
+    />
+    <meta
+      name="description"
+      content="A no-server todo app that keeps your tasks in tasks.md in your own GitHub repo."
     />
     <title>GitTasks</title>
   </head>

@@ -1,4 +1,4 @@
-import type { ErrCode, ErrorInfo } from '../shared/types.ts'
+import type { ErrCode, ErrorInfo } from './types.ts'
 
 /**
  * The only error type business logic throws.

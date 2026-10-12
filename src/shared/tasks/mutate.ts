@@ -3,10 +3,10 @@
  * lines it actually touches are regenerated.
  */
 
-import type { Mutation, ParsedDoc, Project, Task } from '../../shared/types.ts'
+import type { Mutation, ParsedDoc, Project, Task } from '../types.ts'
 import { AppError } from '../errors.ts'
-import { formatProjectHeading, formatTaskLine, setCompleted } from '../../shared/tasks/format.ts'
-import { parseProjectHeading } from '../../shared/tasks/parse.ts'
+import { formatProjectHeading, formatTaskLine, setCompleted } from './format.ts'
+import { parseProjectHeading } from './parse.ts'
 
 export function applyMutation(doc: ParsedDoc, mutation: Mutation): string[] {
   switch (mutation.kind) {

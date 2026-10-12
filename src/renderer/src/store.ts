@@ -8,7 +8,8 @@
 
 import { create } from 'zustand'
 
-import type { Doc, ErrorInfo, FolderState, Mutation, Result, Task } from '../../shared/types.ts'
+import type { Doc, ErrorInfo, Mutation, RepoRef, Result, SessionState, Task } from '../../shared/types.ts'
+import type { ConnectInput } from './api.ts'
 import { api } from './api.ts'
 
 export type Filter = 'all' | 'active' | 'done'
@@ -27,8 +28,11 @@ const EMPTY_DOC: Doc = { hash: '', lines: [''], projects: [], tasks: [] }
 
 type State = {
   ready: boolean
-  folderPath: string | null
+  /** The repo tasks.md is persisted to, if one is connected. */
+  connection: RepoRef | null
   doc: Doc
+  /** True while a mutation is on its way to GitHub as a commit. */
+  saving: boolean
   filter: Filter
   /** The project whose tasks fill the main pane, by title. See `syncProject`. */
   selectedProject: string | null
@@ -40,7 +44,9 @@ type State = {
 
 type Actions = {
   init(): Promise<void>
-  chooseFolder(): Promise<void>
+  connect(input: ConnectInput): Promise<void>
+  disconnect(): Promise<void>
+  refresh(): Promise<void>
   setFilter(filter: Filter): void
   selectProject(title: string): void
   addProject(title: string): Promise<void>
@@ -54,7 +60,6 @@ type Actions = {
   setEditDraft(text: string): void
   commitEdit(): Promise<void>
   cancelEdit(): void
-  open(target: 'folder' | 'tasks'): Promise<void>
   dismissError(): void
   receiveDoc(doc: Doc): void
 }
@@ -69,10 +74,10 @@ export const useStore = create<State & Actions>()((set, get) => {
     else set({ error: result.error })
   }
 
-  function adopt(state: FolderState, extra: Partial<State> = {}): void {
+  function adopt(state: SessionState, extra: Partial<State> = {}): void {
     set({
       ready: true,
-      folderPath: state.folderPath,
+      connection: state.connection,
       doc: state.doc,
       ...extra,
     })
@@ -81,7 +86,12 @@ export const useStore = create<State & Actions>()((set, get) => {
 
   async function mutate(mutation: Mutation, extra: Partial<State> = {}): Promise<void> {
     const { doc } = get()
-    await call(api.apply({ expectedHash: doc.hash, mutation }), (state) => adopt(state, extra))
+    set({ saving: true })
+    try {
+      await call(api.apply({ expectedHash: doc.hash, mutation }), (state) => adopt(state, extra))
+    } finally {
+      set({ saving: false })
+    }
   }
 
   /**
@@ -108,8 +118,9 @@ export const useStore = create<State & Actions>()((set, get) => {
 
   return {
     ready: false,
-    folderPath: null,
+    connection: null,
     doc: EMPTY_DOC,
+    saving: false,
     filter: 'active',
     selectedProject: null,
     composerText: '',
@@ -118,16 +129,34 @@ export const useStore = create<State & Actions>()((set, get) => {
     error: null,
 
     async init() {
-      await call(api.state(), adopt)
+      await call(api.restore(), adopt)
       set({ ready: true })
     },
 
-    async chooseFolder() {
-      await call(api.choose(), (state) => {
-        // A cancelled picker resolves to null; leave everything as it was.
-        // The new folder's own first project is chosen by `adopt`.
-        if (state) adopt(state, { filter: 'active', selectedProject: null })
+    async connect(input) {
+      await call(api.connect(input), (state) => {
+        adopt(state, { filter: 'active', selectedProject: null, composerText: '' })
       })
+    },
+
+    async disconnect() {
+      await call(api.disconnect(), () => {
+        // Back to the connect screen, with the transient state cleared so the
+        // next connection starts fresh.
+        set({
+          connection: null,
+          doc: EMPTY_DOC,
+          filter: 'active',
+          selectedProject: null,
+          composerText: '',
+          editingLine: null,
+          editDraft: '',
+        })
+      })
+    },
+
+    async refresh() {
+      await call(api.refresh(), adopt)
     },
 
     setFilter: (filter) => set({ filter }),
@@ -220,10 +249,6 @@ export const useStore = create<State & Actions>()((set, get) => {
     },
 
     cancelEdit: () => set({ editingLine: null, editDraft: '' }),
-
-    async open(target) {
-      await call(api.open(target), () => {})
-    },
 
     dismissError: () => set({ error: null }),
 

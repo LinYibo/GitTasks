@@ -1,35 +1,93 @@
 # GitTasks
 
-A local-first, no-server, markdown-based todo app.
+A no-server, markdown-based todo app that runs entirely in the browser and
+persists your tasks to **your own GitHub repository**.
 
-Built with [Electron](https://www.electronjs.org/) + [electron-vite](https://electron-vite.org/).
+Your tasks live in a plain `tasks.md` file — one `## heading` per project,
+one `- [ ]` checkbox line per task. Every edit is a single descriptive commit,
+so your repo's history reads like a changelog, and any markdown editor can
+work on the same file alongside the app.
 
-## Download
+Built with [Vite](https://vite.dev/) + [React](https://react.dev/) +
+[Tailwind CSS](https://tailwindcss.com/). There is no backend: the app talks
+to the GitHub REST API directly from your browser.
 
-Grab the latest installer from the
-[Releases page](https://github.com/LinYibo/GitTasks/releases) — look for
-`GitTasks Setup x.y.z.exe`.
+## Connecting a repo
 
-### Windows SmartScreen warning
+1. Open GitTasks and **Sign in with GitHub** (or paste a fine-grained token —
+   see below), pick a repository, branch and file path (default `tasks.md`),
+   and connect.
 
-The installer is **not code-signed**, so the first time you run it Windows may
-show "Windows protected your PC". This is expected, not an error.
+The token and your last document are cached in `localStorage` of your browser
+only. Nothing is sent anywhere except `api.github.com`. Because the token
+lives in the browser, treat the host you deploy to as part of the trust
+boundary — deploy to a host you control over HTTPS.
 
-Click **More info** → **Run anyway** to continue.
+### Sign in with GitHub (OAuth)
 
-(Signing costs money and requires an organizational identity we don't maintain
-for this hobby project. If you don't trust the download, verify the SHA-256
-hash shown on the release against the file you downloaded.)
+GitHub's token exchange requires the OAuth App's client secret, which a static
+site cannot hold. A tiny proxy Worker (in `worker/`) holds the secret and does
+that one call; the app itself stays static. One-time setup:
+
+1. Create an **OAuth App** at [github.com/settings/developers](https://github.com/settings/developers)
+   (not a GitHub App). Homepage URL: `https://gittasks.com`. Authorization callback
+   URL: `https://gittasks.com/oauth/callback`. Note the client ID and generate a
+   client secret.
+2. Deploy the proxy Worker (the route binding in `wrangler.toml` serves it at
+   `gittasks.com/oauth/callback`; the gittasks.com zone must be on Cloudflare):
+   ```bash
+   cd worker
+   npm install
+   # edit wrangler.toml: GITHUB_CLIENT_ID (APP_URL is already gittasks.com)
+   npx wrangler login
+   npx wrangler secret put GITHUB_CLIENT_SECRET
+   npm run deploy
+   ```
+3. Build the app with the OAuth config in `.env.local`:
+   ```
+   VITE_GITHUB_CLIENT_ID=<client id>
+   VITE_OAUTH_PROXY_URL=https://gittasks.com/oauth
+   ```
+
+For local development, run the Worker with `wrangler dev` (port 8787) — copy
+`worker/.dev.vars.example` to `worker/.dev.vars` first, and add a second
+callback `http://localhost:8787/callback` to the OAuth App — then point
+`VITE_OAUTH_PROXY_URL=http://localhost:8787` in `.env.local`.
+
+### Pasting a token instead
+
+The OAuth button needs the setup above, so builds without it fall back to a
+fine-grained personal access token:
+[github.com/settings/personal-access-tokens/new](https://github.com/settings/personal-access-tokens/new)
+with **Contents: read and write** permission for the repo you want to use.
+
+## How syncing works
+
+- The connected repo's `tasks.md` is the single source of truth; the app holds
+  a projection of it, cached for instant reloads and offline viewing.
+- Each mutation is applied to the in-memory document and written back as one
+  commit with a message describing it (`Add task: …`, `Complete task: …`).
+- Writes carry the file's blob sha, so a change committed elsewhere in the
+  meantime is detected as a conflict: the app refreshes and asks you to retry
+  rather than overwriting anyone's work.
+- While the tab is visible, the file is polled every 20 seconds, so edits made
+  in another tab or on GitHub show up without a reload.
 
 ## Development
 
 ```bash
 npm install
-npm run dev          # start in dev mode with hot reload
+npm run dev          # dev server with hot reload
 npm run typecheck    # tsc --build
-npm run test         # node --test
-npm run build:win    # package a Windows installer into dist/
+npm run test         # node --test (pure core: parse, format, mutations)
+npm run build        # production build into dist/
 ```
+
+## Deployment
+
+`npm run build` produces a fully static `dist/`. Serve it from any static
+host — GitHub Pages, Cloudflare Pages, Netlify, or a plain web server. Asset
+paths are relative, so no build-time configuration is needed for subpaths.
 
 ## License
 

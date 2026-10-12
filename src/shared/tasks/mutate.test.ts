@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import { applyMutation } from './mutate.ts'
-import { parseDoc } from '../../shared/tasks/parse.ts'
+import { parseDoc } from './parse.ts'
 
 test('a task is written under the heading of the project it was asked for', () => {
   assert.deepStrictEqual(

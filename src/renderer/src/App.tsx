@@ -6,7 +6,7 @@ import { Composer } from './components/Composer.tsx'
 import { ErrorBanner } from './components/ErrorBanner.tsx'
 import { EmptyState } from './components/EmptyState.tsx'
 import { FilterTabs } from './components/FilterTabs.tsx'
-import { NoFolder } from './components/NoFolder.tsx'
+import { ConnectScreen } from './components/ConnectScreen.tsx'
 import { RepoBar } from './components/RepoBar.tsx'
 import { Sidebar } from './components/Sidebar.tsx'
 import { TaskList } from './components/TaskList.tsx'
@@ -14,7 +14,7 @@ import { useStore } from './store.ts'
 
 export function App() {
   const ready = useStore((state) => state.ready)
-  const folderPath = useStore((state) => state.folderPath)
+  const connection = useStore((state) => state.connection)
 
   const init = useStore((state) => state.init)
   const receiveDoc = useStore((state) => state.receiveDoc)
@@ -23,8 +23,8 @@ export function App() {
     void init()
   }, [init])
 
-  // Main pushes a document whenever the file changes underneath us, for
-  // instance from an edit in another editor.
+  // The session pushes a document whenever polling notices the remote file
+  // changed underneath us — an edit in another tab, a commit on GitHub.
   useEffect(() => api.onDocChanged(receiveDoc), [receiveDoc])
 
   return (
@@ -33,11 +33,13 @@ export function App() {
 
       {ready && (
         <>
-          {folderPath && <Sidebar />}
+          {connection && <Sidebar />}
 
           <main className="flex min-w-0 flex-1 flex-col">
-            {folderPath ? <Tasks /> : <NoFolder />}
+            {connection ? <Tasks /> : <ConnectScreen />}
           </main>
+
+          <ErrorBanner />
         </>
       )}
     </div>

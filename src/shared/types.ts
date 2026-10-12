@@ -1,7 +1,8 @@
 /**
- * Types shared by all three Electron targets (main, preload, renderer).
+ * Types shared by the pure core and the renderer.
  *
- * This file must stay free of `node:` imports — the renderer bundles it.
+ * This file must stay free of `node:` imports — the browser bundles it, and
+ * `node --test` runs the pure core directly.
  */
 
 /** A project: one `## heading` in the document, holding any number of tasks. */
@@ -43,7 +44,10 @@ export type ParsedDoc = {
 
 /** What the renderer holds and sends back. */
 export type Doc = ParsedDoc & {
-  /** sha256 of the LF-normalised file. The concurrency token for mutations. */
+  /**
+   * The git blob sha of tasks.md in the GitHub repo. The concurrency token for
+   * mutations. Empty string means the file does not exist remotely yet.
+   */
   hash: string
 }
 
@@ -56,11 +60,24 @@ export type Mutation =
   | { kind: 'edit'; line: number; text: string }
   | { kind: 'delete'; line: number }
 
+/** Where tasks.md lives: one file in one branch of one GitHub repo. */
+export type RepoRef = {
+  owner: string
+  repo: string
+  branch: string
+  /** Path of the tasks file inside the repo, e.g. `tasks.md`. */
+  path: string
+}
+
 export type ErrCode =
-  | 'NOT_OPEN'
+  | 'NOT_CONNECTED'
   | 'STALE_DOC'
   | 'EMPTY_TASK'
   | 'DUPLICATE_PROJECT'
+  | 'AUTH'
+  | 'NOT_FOUND'
+  | 'NETWORK'
+  | 'RATE_LIMIT'
   | 'IO'
   | 'UNKNOWN'
 
@@ -72,7 +89,7 @@ export type ErrorInfo = {
 export type Result<T> = { ok: true; data: T } | { ok: false; error: ErrorInfo }
 
 /** Everything the renderer needs to draw the app. */
-export type FolderState = {
-  folderPath: string | null
+export type SessionState = {
+  connection: RepoRef | null
   doc: Doc
 }

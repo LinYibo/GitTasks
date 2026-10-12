@@ -1,0 +1,6 @@
+# Copy to .dev.vars for `wrangler dev`. It is gitignored.
+#
+# Set APP_URL to the local origin your Vite dev server is actually on —
+# `npm run dev` prints it (it moves off 5173 when the port is taken).
+APP_URL=http://localhost:5173
+GITHUB_CLIENT_SECRET=your-oauth-app-client-secret
